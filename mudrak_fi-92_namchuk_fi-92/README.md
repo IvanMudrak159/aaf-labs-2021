@@ -9,5 +9,5 @@
 
 ## Графік
     Parser realization (07.10)
-    Commands CREATE, SELECT, WHERE (04.11.2021)
-    Command `JOIN' with full functionality ( advanced CORE ), INSERT, DELETE, 80%+ (02.12.2021)
+    Commands CREATE, SELECT, WHERE, INSERT (04.11.2021)
+    Command `JOIN' with full functionality ( advanced CORE ), DELETE, 80%+ (02.12.2021)
