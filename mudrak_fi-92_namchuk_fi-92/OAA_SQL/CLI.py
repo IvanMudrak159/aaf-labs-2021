@@ -1,12 +1,14 @@
-import  Database
+import Database
 import re
 
 (CREATE, INDEXED, INSERT, INTO, SELECT, FROM, JOIN, ON, WHERE,
- DELETE) = 'CREATE', 'INDEXED', 'INSERT', 'INTO', 'SELECT', 'FROM', 'JOIN', 'ON', 'WHERE', 'DELETE'
+ DELETE, EXIT) = 'CREATE', 'INDEXED', 'INSERT', 'INTO', 'SELECT', 'FROM', 'JOIN', 'ON', 'WHERE', 'DELETE', 'EXIT'
 
-LPAREN, RPAREN, COMMA, LSPAREN, RSPAREN, QUOTES, SEMICOLON = '(', ')', ',', '[', ']', '"', ';'
-
+LPAREN, RPAREN, COMMA, LSPAREN, RSPAREN, QUOTES, ASTERISK, SEMICOLON = '(', ')', ',', '[', ']', '"', '*', ';'
+EQUALS, GREATER, LESS, EXCLAMATION = '=', '>', '<', '!'
 STRING, EOF = 'STRING', 'EOF'
+
+
 class Token(object):
     def __init__(self, type, value):
         self.type = type
@@ -17,6 +19,7 @@ class Token(object):
             type=self.type,
             value=repr(self.value)
         )
+
 
 class Lexer():
     def __init__(self, text):
@@ -30,7 +33,7 @@ class Lexer():
 
     def advance(self):
         self.pos += 1
-        if(self.pos > len(self.text) - 1):
+        if self.pos > len(self.text) - 1:
             self.current_char = None
         else:
             self.current_char = self.text[self.pos]
@@ -39,13 +42,24 @@ class Lexer():
         while(self.current_char.isspace()):
             self.advance()
 
-    def get_string(self):
+    def get_word(self):
         result = self.current_char
         self.advance()
         while re.match("[a-zA-Z0-9_]", self.current_char) is not None:
             result += self.current_char
             self.advance()
         self.current_string = result
+
+    def get_string(self):
+        result = ''
+        while self.current_char != QUOTES:
+            if type(self.current_char).__name__ == 'str':
+                result += self.current_char
+                self.advance()
+            else:
+                return False
+        self.current_string = result
+        return True
 
     def get_next_token(self):
         while self.current_char is not None:
@@ -54,15 +68,25 @@ class Lexer():
                 self.check_whitespace()
 
             if re.match("[a-zA-Z]", self.current_char) is not None:
-                self.get_string()
+                self.get_word()
                 if self.current_string.upper() == CREATE:
                     return Token(CREATE, 'CREATE')
                 elif self.current_string.upper() == INSERT:
                     return Token(INSERT, 'INSERT')
+                elif self.current_string.upper() == SELECT:
+                    return Token(SELECT, 'SELECT')
+                elif self.current_string.upper() == WHERE:
+                    return Token(WHERE, 'WHERE')
                 elif self.current_string.upper() == DELETE:
-                    return Token(INSERT, 'DELETE')
+                    return Token(DELETE, 'DELETE')
                 elif self.current_string.upper() == INDEXED:
                     return Token(INDEXED, 'INDEXED')
+                elif self.current_string.upper() == INTO:
+                    return Token(INTO, 'INTO')
+                elif self.current_string.upper() == FROM:
+                    return Token(FROM, 'FROM')
+                elif self.current_string.upper() == EXIT:
+                    return Token(EXIT, 'EXIT')
                 else:
                     return Token(STRING, self.current_string)
 
@@ -87,7 +111,22 @@ class Lexer():
             elif self.current_char == QUOTES:
                 self.advance()
                 return Token(QUOTES, '"')
-            raise Exception("Unknown symbols")
+            elif self.current_char == ASTERISK:
+                self.advance()
+                return Token(STRING, '*')
+            elif self.current_char == EQUALS:
+                self.advance()
+                return Token(EQUALS, '=')
+            elif self.current_char == GREATER:
+                self.advance()
+                return Token(GREATER, '>')
+            elif self.current_char == LESS:
+                self.advance()
+                return Token(LESS, '<')
+            elif self.current_char == EXCLAMATION:
+                self.advance()
+                return Token(EXCLAMATION, '!')
+            break
 
         return Token(EOF, None)
 
@@ -99,16 +138,13 @@ class Parser():
         self.current_token = self.lexer.get_next_token()
 
     def error(self):
-        raise Exception('Invalid syntax')
+        input_text(self.db)
 
     def eat(self, token_type):
-        # compare the current token type with the passed token
-        # type and if they match then "eat" the current token
-        # and assign the next token to the self.current_token,
-        # otherwise raise an exception.
         if self.current_token.type == token_type:
             self.current_token = self.lexer.get_next_token()
         else:
+            print('Invalid syntax')
             self.error()
 
     def factor1(self):
@@ -123,23 +159,28 @@ class Parser():
         self.eat(STRING)
         self.eat(LPAREN)
         args = []
-        args.append(self.current_token.value)
+        value = [self.current_token.value]
+        args.append(value)
         self.factor1()
         while self.current_token.type != RPAREN:
             self.eat(COMMA)
-            args.append(self.current_token.value)
+            value = [self.current_token.value]
+            args.append(value)
             self.factor1()
         self.eat(RPAREN)
         self.eat(SEMICOLON)
 
+        self.db.create(table_name, args)
 
     def factor2(self):
         left_pos = self.lexer.pos
-        self.eat(QUOTES)
-        while self.current_token.type != QUOTES:
-            self.eat(STRING)
-        right_pos = self.lexer.pos - 1
-        value = self.lexer.text[left_pos : right_pos]
+        self.lexer.advance()
+        if not self.lexer.get_string():
+            print("Invalid syntax. Expected string")
+            self.error()
+        right_pos = self.lexer.pos
+        value = self.lexer.text[left_pos: right_pos]
+        self.lexer.advance()
         self.eat(QUOTES)
         return value
 
@@ -147,21 +188,57 @@ class Parser():
         self.eat(INSERT)
         if self.current_token.type == INTO:
             self.eat(INTO)
-        print('Table name:', self.current_token.value)
+        table_name = self.current_token.value
         self.eat(STRING)
         self.eat(LPAREN)
-        print("Value:",self.factor2())
+        args = []
+        args.append(self.factor2())
         while self.current_token.type != RPAREN:
             self.eat(COMMA)
-            print("Value:", self.factor2())
+            args.append(self.factor2())
         self.eat(RPAREN)
         self.eat(SEMICOLON)
+
+        self.db.insert(table_name, args)
+
+    def factor3(self):
+        result = ''
+        while self.current_token.type != QUOTES and self.current_token.type != EOF:
+            result += self.current_token.value
+            self.eat(self.current_token.type)
+        if result in ('=', '!=', '>', '<', '>=', '<='):
+            return result
+        else:
+            print("Invalid syntax. Incorrect operator.")
+
+    def select(self):
+        self.eat(SELECT)
+        columns = []
+        while self.current_token.type != FROM:
+            if self.current_token.type == COMMA:
+                self.eat(COMMA)
+            columns.append(self.current_token.value)
+            self.eat(STRING)
+        self.eat(FROM)
+        table_name = self.current_token.value
+        self.eat(STRING)
+        if self.current_token.type == WHERE:
+            self.eat(WHERE)
+            column_name = [self.current_token.value]
+            self.eat(STRING)
+            operator = self.factor3()
+            value = self.factor2().strip()
+            self.eat(SEMICOLON)
+            self.db.select(table_name, columns, column_name, operator, value)
+        else:
+            self.eat(SEMICOLON)
+            self.db.select(table_name, columns)
 
     def delete(self):
         self.eat(DELETE)
         if self.current_token.type == FROM:
             self.eat(FROM)
-        print("Table name:",self.current_token.value)
+        table_name = self.current_token.value
         self.eat(STRING)
         if self.current_token.type == WHERE:
             self.eat(WHERE)
@@ -172,14 +249,25 @@ class Parser():
             self.create()
         elif command == INSERT:
             self.insert()
+        elif command == SELECT:
+            self.select()
         elif command == DELETE:
             self.delete()
+        elif command == EXIT:
+            SystemExit()
         else:
-            raise Exception("Invalid syntax")
+            print("Invalid syntax")
 
 
-def main():
-    db = Database.Database()
+class CLI:
+    def __init__(self, db):
+        self.db = db
+
+    def run(self):
+        input_text(self.db)
+
+
+def input_text(db):
     text = ''
     while True:
         try:
@@ -188,6 +276,8 @@ def main():
             break
         if not text:
             continue
+        if text.upper() == 'EXIT':
+            exit()
         if ';' not in text:
             text += '\n'
             continue
@@ -195,7 +285,3 @@ def main():
         parser = Parser(lexer, db)
         parser.parse()
         text = ''
-
-
-if __name__ == '__main__':
-    main()
