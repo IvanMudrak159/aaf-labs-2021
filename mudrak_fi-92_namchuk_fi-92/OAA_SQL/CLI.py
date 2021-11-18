@@ -21,15 +21,12 @@ class Token(object):
         )
 
 
-class Lexer():
+class Lexer:
     def __init__(self, text):
         self.text = text
         self.pos = 0
         self.current_char = self.text[self.pos]
         self.current_string = None
-
-    def error(self):
-        raise Exception('Invalid character')
 
     def advance(self):
         self.pos += 1
@@ -39,7 +36,7 @@ class Lexer():
             self.current_char = self.text[self.pos]
 
     def check_whitespace(self):
-        while(self.current_char.isspace()):
+        while self.current_char.isspace():
             self.advance()
 
     def get_word(self):
@@ -127,11 +124,10 @@ class Lexer():
                 self.advance()
                 return Token(EXCLAMATION, '!')
             break
-
         return Token(EOF, None)
 
 
-class Parser():
+class Parser:
     def __init__(self, lexer, database):
         self.lexer = lexer
         self.db = database
@@ -182,6 +178,8 @@ class Parser():
         value = self.lexer.text[left_pos: right_pos]
         self.lexer.advance()
         self.eat(QUOTES)
+        if value.isdigit():
+            return int(value)
         return value
 
     def insert(self):
@@ -203,13 +201,26 @@ class Parser():
 
     def factor3(self):
         result = ''
-        while self.current_token.type != QUOTES and self.current_token.type != EOF:
+        while self.current_token.type != QUOTES and self.current_token.type != STRING:
             result += self.current_token.value
             self.eat(self.current_token.type)
         if result in ('=', '!=', '>', '<', '>=', '<='):
             return result
         else:
             print("Invalid syntax. Incorrect operator.")
+
+    def factor4(self):
+        if self.current_token.type == QUOTES:
+            result = self.factor2()
+            if type(result).__name__ == 'int':
+                return Token("Value", result)
+            return Token("Value", result.strip())
+        elif self.current_token.type == STRING:
+            result = self.current_token.value
+            self.eat(STRING)
+            return Token("Column", result)
+        else:
+            self.error()
 
     def select(self):
         self.eat(SELECT)
@@ -224,12 +235,11 @@ class Parser():
         self.eat(STRING)
         if self.current_token.type == WHERE:
             self.eat(WHERE)
-            column_name = [self.current_token.value]
-            self.eat(STRING)
+            left_value = self.factor4()
             operator = self.factor3()
-            value = self.factor2().strip()
+            right_value = self.factor4()
             self.eat(SEMICOLON)
-            self.db.select(table_name, columns, column_name, operator, value)
+            self.db.select(table_name, columns, left_value, operator, right_value)
         else:
             self.eat(SEMICOLON)
             self.db.select(table_name, columns)
@@ -242,6 +252,14 @@ class Parser():
         self.eat(STRING)
         if self.current_token.type == WHERE:
             self.eat(WHERE)
+            left_value = self.factor4()
+            operator = self.factor3()
+            right_value = self.factor4()
+            self.eat(SEMICOLON)
+            self.db.delete(table_name, left_value, operator, right_value)
+        else:
+            self.eat(SEMICOLON)
+            self.db.delete(table_name)
 
     def parse(self):
         command = self.current_token.type

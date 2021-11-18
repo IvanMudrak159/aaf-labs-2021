@@ -1,6 +1,7 @@
 import Table
 
-class Database():
+
+class Database:
     def __init__(self):
         self.tables = []
         self.current_table = None
@@ -32,9 +33,13 @@ class Database():
         else:
             print("Table with such name doesn't exist.")
 
-    def delete(self, table_name):
+    def delete(self, table_name, *args):
         if self.check_table_presence(table_name):
-            #TODO: delete table
-            print('Table {0} has been deleted'.format(table_name))
+            if len(args) == 0:
+                self.tables.remove(self.current_table)
+                self.current_table = None
+                print("Table {0} has been deleted".format(table_name))
+            else:
+                self.current_table.delete(*args)
         else:
             print("Table with such name doesn't exist.")

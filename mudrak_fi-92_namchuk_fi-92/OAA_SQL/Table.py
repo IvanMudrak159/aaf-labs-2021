@@ -28,42 +28,72 @@ class Table(object):
         else:
             print("Inconsistent number of values added to the table.")
 
-    def select(self, columns, *args):
+    def select(self, columns, left_token = None, operator = None, right_token = None):
         if columns == ['*']:
             columns = self.columns
-        selected_column = None
-        operator = None
-        const = None
-        has_conditions = False
-        if len(args) != 0:
-            has_conditions = True
-            if not self.check_columns_presence(args[0]):
-                print('Column name does not match table definition.')
-                return
-            selected_column = self.get_column_index(args[0])[0]
-            operator = args[1]
-            const = args[2]
+        select_condition = self.empty()
+        if left_token and operator and right_token:
+            select_condition = self.condition(left_token, right_token, operator)
+            for token in [left_token, right_token]:
+                if token.type == "Column":
+                    if not self.check_columns_presence(token.value):
+                        return
         if self.check_columns_presence(columns):
-            indexes = self.get_column_index(columns)
+            indexes = []
+            for col in columns:
+                indexes.append(self.get_column_index(col))
             table = PrettyTable(columns)
+            #TODO: rename empty func
             for i in range(len(self.values[0]) - 1):
-                if not has_conditions or ops[operator](self.values[selected_column][i+1], const):
+                if select_condition(i + 1):
                     value = []
                     for index in indexes:
                         value.append(self.values[index][i+1])
                     table.add_row(value)
             print(table)
-        else:
-            print('Column name does not match table definition.')
 
-    def get_column_index(self, columns):
+    def delete(self, left_token = None, operator = None, right_token = None):
+        delete_condition = self.condition(left_token, right_token, operator)
         indexes = []
-        for column in columns:
-            indexes.append(self.columns.index(column))
-        return indexes
+        for i in range(len(self.values[0]) - 1):
+            if delete_condition(i + 1):
+                indexes.append(i + 1)
+        line_index = len(indexes) - 1
+        deleted_rows = len(indexes)
+        while line_index >= 0:
+            for column_index in range(len(self.values)):
+                self.values[column_index].pop(indexes[line_index])
+            line_index -= 1
+        if deleted_rows == 1:
+            print("{0} row has been deleted".format(deleted_rows))
+        else:
+            print("{0} rows have been deleted".format(deleted_rows))
+
+    def empty(self):
+        return lambda i: True
+
+    def condition(self, left_token, right_token, operator):
+        if left_token.type == "Value":
+            if right_token.type == "Value":
+                return lambda i: ops[operator](left_token.value, right_token.value)
+            else:
+                index = self.get_column_index(right_token.value)
+                return lambda i: ops[operator](left_token.value, self.values[index][i])
+        else:
+            if right_token.type == "Value":
+                index = self.get_column_index(left_token.value)
+                return lambda i: ops[operator](self.values[index][i], right_token.value)
+            else:
+                l_index = self.get_column_index(left_token.value)
+                r_index = self.get_column_index(right_token.value)
+                return lambda i: ops[operator](self.values[l_index][i], self.values[r_index][i])
+
+    def get_column_index(self, column):
+        return self.columns.index(column)
 
     def check_columns_presence(self, columns):
         for el in columns:
             if el not in self.columns:
+                print('Column name does not match table definition.')
                 return False
         return True

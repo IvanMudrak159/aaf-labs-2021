@@ -1,17 +1,24 @@
 import Database
 import CLI
-import bst
+import Index
 
 def main():
     db = Database.Database()
     cli = CLI.CLI(db)
     cli.run()
-
+def y(operator):
+    if operator == "*":
+        print(operator)
+        return lambda a,b: a*b
+    elif operator == "/":
+        print(operator)
+        return lambda a,b: a/b
 def x():
-    tree = bst.BST()
-    tree.insert(1)
-    tree.insert(5)
-    tree.insert(3)
+    x = [[1,2,3],[4,5,6]]
+    for i in range(len(x)):
+        for y in range(len(x[i])):
+            print(x[i][y])
+
 
 if __name__ == '__main__':
-    x()
+    main()
