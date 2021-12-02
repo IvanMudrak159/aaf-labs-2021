@@ -13,11 +13,11 @@ class Database:
                 return True
         return False
 
-    def create(self, table_name, args):
+    def create(self, table_name, columns, columns_id):
         if self.check_table_presence(table_name):
             print("Table with such name already exist. Please try another name")
         else:
-            table = Table.Table(table_name, args)
+            table = Table.Table(table_name, columns, columns_id)
             self.tables.append(table)
             print('Table {0} has been created'.format(table_name))
 

@@ -6,19 +6,22 @@ def main():
     db = Database.Database()
     cli = CLI.CLI(db)
     cli.run()
-def y(operator):
-    if operator == "*":
-        print(operator)
-        return lambda a,b: a*b
-    elif operator == "/":
-        print(operator)
-        return lambda a,b: a/b
-def x():
-    x = [[1,2,3],[4,5,6]]
-    for i in range(len(x)):
-        for y in range(len(x[i])):
-            print(x[i][y])
+    db.create('map', ['x','y'], [0])
 
+def y():
+    db = Database.Database()
+    cli = CLI.CLI(db)
+    # db.create('map', ['x', 'y'], [0,1])
+    # db.insert('map', ['1', '2'])
+    # db.insert('map', ['3', '14'])
+    # db.insert('map', ['5', '6'])
+    # db.select('map', ['x','y'])
+    cli.run()
+
+def x():
+    x = [0,1]
+    for i in x:
+        print(i)
 
 if __name__ == '__main__':
-    main()
+    y()

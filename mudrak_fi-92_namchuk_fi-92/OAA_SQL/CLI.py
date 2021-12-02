@@ -144,29 +144,46 @@ class Parser:
             self.error()
 
     def factor1(self):
+        column = self.current_token.value
         self.eat(STRING)
         if self.current_token.type == INDEXED:
-            print("Column has indexed")
+            print("{0} has indexed".format(column))
             self.eat(INDEXED)
+            return True
+        return False
 
     def create(self):
+        has_indexed = False
         self.eat(CREATE)
         table_name = self.current_token.value
         self.eat(STRING)
         self.eat(LPAREN)
-        args = []
-        value = [self.current_token.value]
-        args.append(value)
-        self.factor1()
+        columns = []
+        value = self.current_token.value
+        columns.append(value)
+        #TODO: refactor
+        has_indexed = self.factor1()
+        columns_id = []
+        column_counter = 0
+        if has_indexed:
+            columns_id.append(column_counter)
+
         while self.current_token.type != RPAREN:
+
             self.eat(COMMA)
-            value = [self.current_token.value]
-            args.append(value)
-            self.factor1()
+            value = self.current_token.value
+            columns.append(value)
+
+            has_indexed = self.factor1()
+            column_counter += 1
+            if has_indexed:
+                columns_id.append(column_counter)
+
+
         self.eat(RPAREN)
         self.eat(SEMICOLON)
 
-        self.db.create(table_name, args)
+        self.db.create(table_name, columns, columns_id)
 
     def factor2(self):
         left_pos = self.lexer.pos
@@ -178,8 +195,6 @@ class Parser:
         value = self.lexer.text[left_pos: right_pos]
         self.lexer.advance()
         self.eat(QUOTES)
-        if value.isdigit():
-            return int(value)
         return value
 
     def insert(self):
@@ -189,15 +204,14 @@ class Parser:
         table_name = self.current_token.value
         self.eat(STRING)
         self.eat(LPAREN)
-        args = []
-        args.append(self.factor2())
+        values = []
+        values.append(self.factor2())
         while self.current_token.type != RPAREN:
             self.eat(COMMA)
-            args.append(self.factor2())
+            values.append(self.factor2())
         self.eat(RPAREN)
         self.eat(SEMICOLON)
-
-        self.db.insert(table_name, args)
+        self.db.insert(table_name, values)
 
     def factor3(self):
         result = ''
@@ -212,8 +226,6 @@ class Parser:
     def factor4(self):
         if self.current_token.type == QUOTES:
             result = self.factor2()
-            if type(result).__name__ == 'int':
-                return Token("Value", result)
             return Token("Value", result.strip())
         elif self.current_token.type == STRING:
             result = self.current_token.value
