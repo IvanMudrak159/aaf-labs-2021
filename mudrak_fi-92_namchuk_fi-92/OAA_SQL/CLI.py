@@ -82,6 +82,10 @@ class Lexer:
                     return Token(INTO, 'INTO')
                 elif self.current_string.upper() == FROM:
                     return Token(FROM, 'FROM')
+                elif self.current_string.upper() == JOIN:
+                    return Token(JOIN, 'JOIN')
+                elif self.current_string.upper() == ON:
+                    return Token(ON, 'ON')
                 elif self.current_string.upper() == EXIT:
                     return Token(EXIT, 'EXIT')
                 else:
@@ -182,7 +186,6 @@ class Parser:
 
         self.eat(RPAREN)
         self.eat(SEMICOLON)
-
         self.db.create(table_name, columns, columns_id)
 
     def factor2(self):
@@ -232,9 +235,11 @@ class Parser:
             self.eat(STRING)
             return Token("Column", result)
         else:
+            print('Invalid syntax')
             self.error()
 
     def select(self):
+        second_table_name, left_column, right_column, left_token, operator, right_token = None, None, None, None, None, None
         self.eat(SELECT)
         columns = []
         while self.current_token.type != FROM:
@@ -245,16 +250,22 @@ class Parser:
         self.eat(FROM)
         table_name = self.current_token.value
         self.eat(STRING)
+        if self.current_token.type == JOIN:
+            self.eat(JOIN)
+            second_table_name = self.current_token.value
+            self.eat(STRING)
+            if self.current_token.type == ON:
+                self.eat(ON)
+                left_column = self.factor4()
+                self.eat(EQUALS)
+                right_column = self.factor4()
         if self.current_token.type == WHERE:
             self.eat(WHERE)
-            left_value = self.factor4()
+            left_token = self.factor4()
             operator = self.factor3()
-            right_value = self.factor4()
-            self.eat(SEMICOLON)
-            self.db.select(table_name, columns, left_value, operator, right_value)
-        else:
-            self.eat(SEMICOLON)
-            self.db.select(table_name, columns)
+            right_token = self.factor4()
+        self.eat(SEMICOLON)
+        self.db.select(table_name, columns, second_table_name, left_column, right_column, left_token, operator, right_token)
 
     def delete(self):
         self.eat(DELETE)

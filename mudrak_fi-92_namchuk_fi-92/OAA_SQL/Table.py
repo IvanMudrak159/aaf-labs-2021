@@ -31,17 +31,72 @@ class Table(object):
 
             for index in self.indexes:
                 index.insert(values[index.id], self.id - 1)
-            print("1 row has been inserted into {0}.".format(self.name))
         else:
             print("Inconsistent number of values added to the table.")
 
-    def select(self, columns, left_token = None, operator = None, right_token = None):
+    def select(self, columns, second_table = None, left_column = None, right_column = None, left_token = None, operator = None, right_token = None):
+        if second_table:
+            first_table_columns = []
+            second_table_columns = []
+            if columns == ['*']:
+                first_table_columns = self.columns
+                second_table_columns = second_table.columns
+            else:
+                for column in columns:
+                    if self.check_columns_presence([column]):
+                        first_table_columns.append(column)
+                    elif second_table.check_columns_presence([column]):
+                        second_table_columns.append(column)
+                    else:
+                        print('Column name does not match any table definition.')
+                        return
+            first_table_columns_id = []
+            second_table_columns_id = []
+            for id in first_table_columns:
+                first_table_columns_id.append(self.get_column_index(id))
+            for id in second_table_columns:
+                second_table_columns_id.append(second_table.get_column_index(id))
+
+            if left_column and right_column:
+                if not self.check_columns_presence([left_column.value]) or not second_table.check_columns_presence([right_column.value]):
+                    print('Invalid syntax in ON check.')
+                    return
+                left_column_id = self.get_column_index(left_column.value)
+                right_column_id = second_table.get_column_index(right_column.value)
+                new_table = Table('temp', first_table_columns + second_table_columns, [])
+                for i in self.values.keys():
+                    value = []
+                    for id in first_table_columns_id:
+                        value.append(self.values[i][id])
+
+                    for j in second_table.values.keys():
+                        if self.values[i][left_column_id] == second_table.values[j][right_column_id]:
+                            for id in second_table_columns_id:
+                                value.append(second_table.values[j][id])
+                            new_table.insert(value)
+                            break
+                return new_table.select(['*'], left_token= left_token, operator= operator, right_token= right_token)
+            else:
+                new_table = Table('temp', first_table_columns + second_table_columns, [])
+                for i in self.values.keys():
+                    value = []
+                    for id in first_table_columns_id:
+                        value.append(self.values[i][id])
+                    for j in second_table.values.keys():
+                        temp_value = value[:]
+                        for id in second_table_columns_id:
+                            temp_value.append(second_table.values[j][id])
+                        new_table.insert(temp_value)
+                return new_table.select(['*'], left_token= left_token, operator= operator, right_token= right_token)
+
         if columns == ['*']:
             columns = self.columns
+
         if left_token and operator and right_token:
             select_condition = self.condition(left_token, right_token, operator)
             result = self.define(left_token, right_token)
             if result == 0:
+                print('Error')
                 return
             elif result == 1:
                 #l and r = value
@@ -99,6 +154,8 @@ class Table(object):
                         value.append(self.values[i][index])
                     table.add_row(value)
             print(table)
+        else:
+            print('Column name does not match table definition.')
 
     def delete(self, left_token = None, operator = None, right_token = None):
         delete_condition = self.condition(left_token, right_token, operator)
@@ -107,7 +164,6 @@ class Table(object):
 
         lines = []
         if result == 0:
-            print('Error')
             return
         elif result == 1:
             # l and r = value
@@ -142,7 +198,8 @@ class Table(object):
     def define(self,left_token, right_token):
         for token in [left_token, right_token]:
             if token.type == "Column":
-                if not self.check_columns_presence(token.value):
+                if not self.check_columns_presence([token.value]):
+                    print('Column name does not match table definition.')
                     return 0
         if left_token.type == "Value":
             if right_token.type == "Value":
@@ -160,6 +217,7 @@ class Table(object):
 
     def false(self):
         return lambda i: False
+
     def condition(self, left_token, right_token, operator):
         if left_token.type == "Value":
             if right_token.type == "Value":
@@ -182,6 +240,5 @@ class Table(object):
     def check_columns_presence(self, columns):
         for el in columns:
             if el not in self.columns:
-                print('Column name does not match table definition.')
                 return False
         return True
