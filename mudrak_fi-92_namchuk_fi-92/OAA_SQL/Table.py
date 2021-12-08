@@ -1,3 +1,4 @@
+from sortedcontainers import SortedDict
 from prettytable import PrettyTable
 import operator
 import Index
@@ -64,18 +65,41 @@ class Table(object):
                 left_column_id = self.get_column_index(left_column.value)
                 right_column_id = second_table.get_column_index(right_column.value)
                 new_table = Table('temp', first_table_columns + second_table_columns, [])
-                for i in self.values.keys():
-                    value = []
-                    for id in first_table_columns_id:
-                        value.append(self.values[i][id])
 
-                    for j in second_table.values.keys():
-                        if self.values[i][left_column_id] == second_table.values[j][right_column_id]:
-                            for id in second_table_columns_id:
-                                value.append(second_table.values[j][id])
-                            new_table.insert(value)
+                join_index = None
+                main_table = self
+                secondary_table = second_table
+                key_column = self.get_column_index(left_column.value)
+                for index in self.indexes:
+                    if index.id == left_column_id:
+                        join_index = index
+                        break
+                if join_index is None:
+                    for index in second_table.indexes:
+                        if index.id == right_column_id:
+                            join_index = index
+                            main_table = second_table
+                            secondary_table = self
+                            key_column = second_table.get_column_index(right_column.value)
                             break
-                return new_table.select(['*'], left_token= left_token, operator= operator, right_token= right_token)
+
+                if join_index is None:
+                    return self.join_1(first_table_columns_id, left_column, left_token, new_table, operator,
+                                       right_column, right_token, second_table, second_table_columns_id)
+                else:
+                    for i in secondary_table.values.keys():
+                        lines = join_index.values.get(secondary_table.values[i][key_column])
+                        if lines is not None:
+                            for row_id in lines:
+                                value = []
+                                for first_table_id in first_table_columns_id:
+                                    value.append(self.values[row_id][first_table_id])
+                                for second_table_id in second_table_columns_id:
+                                    value.append(second_table.values[i][second_table_id])
+                                new_table.insert(value)
+                    return new_table.select(['*'], left_token=left_token, operator=operator, right_token=right_token)
+
+
             else:
                 new_table = Table('temp', first_table_columns + second_table_columns, [])
                 for i in self.values.keys():
@@ -123,6 +147,39 @@ class Table(object):
         else:
             self.print_table(columns, self.true(), self.values.keys())
 
+    def join_1(self, first_table_columns_id, left_column, left_token, new_table, operator, right_column, right_token,
+               second_table, second_table_columns_id):
+        join_index = SortedDict()
+        smaller_table = second_table
+        bigger_table = self
+        key_column = second_table.get_column_index(right_column.value)
+        value_column = self.get_column_index(left_column.value)
+        if len(self.values) < len(second_table.values):
+            smaller_table = self
+            bigger_table = second_table
+            key_column = smaller_table.get_column_index(left_column.value)
+            value_column = bigger_table.get_column_index(right_column.value)
+        for i in smaller_table.values.keys():
+            key = smaller_table.values[i][key_column]
+            join_index.update({key: []})
+        for i in bigger_table.values.keys():
+            value = bigger_table.values[i][value_column]
+            if join_index.get(value) is not None:
+                values = join_index[value]
+                values.append(i)
+        row_count = 0
+        for key in join_index.keys():
+            value = []
+            for el in join_index[key]:
+                for id in first_table_columns_id:
+                    value.append(self.values[el][id])
+                for id in second_table_columns_id:
+                    value.append(second_table.values[row_count][id])
+                new_table.insert(value)
+                value = []
+            row_count += 1
+        return new_table.select(['*'], left_token=left_token, operator=operator, right_token=right_token)
+
     def get_index(self, token):
         for index in self.indexes:
             if self.columns[index.id] == token.value:
@@ -158,36 +215,39 @@ class Table(object):
             print('Column name does not match table definition.')
 
     def delete(self, left_token = None, operator = None, right_token = None):
-        delete_condition = self.condition(left_token, right_token, operator)
+        delete_condition = self.true()
         deleted_rows = 0
-        result = self.define(left_token, right_token)
+        lines = list(self.values)
+        if left_token and operator and right_token:
+            delete_condition = self.condition(left_token, right_token, operator)
+            result = self.define(left_token, right_token)
 
-        lines = []
-        if result == 0:
-            return
-        elif result == 1:
-            # l and r = value
-            if delete_condition(0):
-                delete_condition = self.true()
+            if result == 0:
+                return
+            elif result == 1:
+                # l and r = value
+                if delete_condition(0):
+                    delete_condition = self.true()
+                else:
+                    delete_condition = self.false()
+                lines = list(self.values)
+            elif result == 2:
+                # l = value, r = column
+                index = self.get_index(right_token)
+                if index:
+                    lines = index.get_lines(self.invert_operator(operator), left_token.value)
+            elif result == 3:
+                # l = column, r = value
+                index = self.get_index(left_token)
+                if index:
+                    lines = index.get_lines(operator, right_token.value)
             else:
-                delete_condition = self.false()
-            lines = list(self.values)
-        elif result == 2:
-            # l = value, r = column
-            index = self.get_index(right_token)
-            if index:
-                lines = index.get_lines(self.invert_operator(operator), left_token.value)
-        elif result == 3:
-            # l = column, r = value
-            index = self.get_index(left_token)
-            if index:
-                lines = index.get_lines(operator, right_token.value)
-        else:
-            # l = column, r = column
-            lines = list(self.values)
-
-        for i in list(self.values):
+                # l = column, r = column
+                lines = list(self.values)
+        for i in lines:
             if delete_condition(i):
+                for index in self.indexes:
+                    index.values.pop(self.values[i][index.id])
                 deleted_rows += 1
                 del self.values[i]
         if deleted_rows == 1:

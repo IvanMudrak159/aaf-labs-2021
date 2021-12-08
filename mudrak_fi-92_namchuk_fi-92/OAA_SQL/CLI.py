@@ -1,4 +1,3 @@
-import Database
 import re
 
 (CREATE, INDEXED, INSERT, INTO, SELECT, FROM, JOIN, ON, WHERE,
