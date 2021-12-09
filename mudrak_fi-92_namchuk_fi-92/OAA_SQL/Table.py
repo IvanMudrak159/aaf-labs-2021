@@ -247,7 +247,7 @@ class Table(object):
         for i in lines:
             if delete_condition(i):
                 for index in self.indexes:
-                    index.values.pop(self.values[i][index.id])
+                    index.values.pop(self.values[i])
                 deleted_rows += 1
                 del self.values[i]
         if deleted_rows == 1:
