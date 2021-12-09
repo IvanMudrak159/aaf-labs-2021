@@ -128,7 +128,7 @@ class Table(object):
             elif result == 2:
                 #l = value, r = column
                 index = self.get_index(right_token)
-                if index:
+                if index and operator != '!=':
                     row_indexes = index.get_lines(self.invert_operator(operator), left_token.value)
                     self.print_table(columns, self.true(), row_indexes)
                 else:
@@ -136,7 +136,7 @@ class Table(object):
             elif result == 3:
                 #l = column, r = value
                 index = self.get_index(left_token)
-                if index:
+                if index and operator != '!=':
                     row_indexes = index.get_lines(operator, right_token.value)
                     self.print_table(columns, self.true(), row_indexes)
                 else:

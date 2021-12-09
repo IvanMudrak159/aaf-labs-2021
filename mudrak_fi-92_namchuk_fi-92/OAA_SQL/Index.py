@@ -12,7 +12,6 @@ class Index:
             self.values[column_value] = [lines_id]
 
     def get_lines(self, operator, value):
-        print('index')
         if operator == '=':
             lines_id = self.values.get(value)
             if lines_id:
@@ -20,33 +19,18 @@ class Index:
             return []
         elif operator == '>':
             lines_id = []
-            is_bigger = False
-            for i in self.values.keys():
-                if is_bigger:
-                    for j in range(len(self.values[i])):
-                        lines_id.append(self.values[i][j])
-                if i == value:
-                    is_bigger = True
-            if lines_id is None:
-                return []
+            key_list = list(self.values.keys())
+            key_pos = key_list.index(value)
+            for i in range(key_pos + 1, len(key_list)):
+                key = key_list[i]
+                for j in range(len(self.values[key])):
+                    lines_id.append(self.values[key][j])
             return lines_id
         elif operator == '<':
             lines_id = []
             for i in self.values.keys():
                 if i == value:
-                    return lines_id
+                    break
                 for j in range(len(self.values[i])):
                     lines_id.append(self.values[i][j])
-            if lines_id is None:
-                return []
-            return lines_id
-        elif operator == '!=':
-            lines_id = []
-            for i in self.values.keys():
-                if i == value:
-                    continue
-                for j in range(len(self.values[i])):
-                    lines_id.append(self.values[i][j])
-            if lines_id is None:
-                return []
             return lines_id
