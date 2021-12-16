@@ -1,8 +1,8 @@
-from sortedcontainers import SortedDict
+import sortedcontainers
 
 class Index:
     def __init__(self, id = 0):
-        self.values = SortedDict()
+        self.values = sortedcontainers.SortedDict()
         self.id = id
 
     def insert(self, column_value, lines_id):
@@ -18,22 +18,13 @@ class Index:
                 return lines_id
             return []
 
-        keys_list = list(self.values.keys())
-        mid = len(keys_list) // 2
-        low = 0
-        high = len(keys_list) - 1
-        while keys_list[mid] != value and low <= high:
-            if value > keys_list[mid]:
-                low = mid + 1
-            else:
-                high = mid - 1
-            mid = (low + high) // 2
+        keys_list = sortedcontainers.SortedList(list(self.values.keys()))
+        key_pos = keys_list.bisect_left(value)
 
         if operator == '>' or operator == '>=':
             lines_id = []
-            key_pos = mid + 1
-            if operator == '>=':
-                key_pos -= 1
+            if self.values.get(value) is not None and operator == '>':
+                key_pos += 1
             for i in range(key_pos, len(keys_list)):
                 key = keys_list[i]
                 for j in range(len(self.values[key])):
@@ -41,8 +32,7 @@ class Index:
             return lines_id
         elif operator == '<' or operator == '<=':
             lines_id = []
-            key_pos = mid
-            if operator == '<=':
+            if self.values.get(value) is not None and operator == '<=':
                 key_pos += 1
             for i in range(0, key_pos):
                 key = keys_list[i]

@@ -23,8 +23,8 @@ class Database:
 
     def insert(self, table_name, args):
         if self.check_table_presence(table_name):
-            self.current_table.insert(args)
-            print("1 row has been inserted into {0}.".format(table_name))
+            if self.current_table.insert(args):
+                print("1 row has been inserted into {0}.".format(table_name))
         else:
             print("Table with such name doesn't exist.")
 

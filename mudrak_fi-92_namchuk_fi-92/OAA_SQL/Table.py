@@ -1,4 +1,3 @@
-from sortedcontainers import SortedDict
 from prettytable import PrettyTable
 import operator
 import Index
@@ -32,6 +31,7 @@ class Table(object):
 
             for index in self.indexes:
                 index.insert(values[index.id], self.id - 1)
+            return True
         else:
             print("Inconsistent number of values added to the table.")
 
@@ -67,9 +67,9 @@ class Table(object):
                 new_table = Table('temp', first_table_columns + second_table_columns, [])
 
                 join_index = None
-                main_table = self
-                secondary_table = second_table
-                key_column = self.get_column_index(left_column.value)
+                table_with_index = self
+                table_without_index = second_table
+                second_table_column_id = table_without_index.get_column_index(right_column.value)
                 for index in self.indexes:
                     if index.id == left_column_id:
                         join_index = index
@@ -78,26 +78,17 @@ class Table(object):
                     for index in second_table.indexes:
                         if index.id == right_column_id:
                             join_index = index
-                            main_table = second_table
-                            secondary_table = self
-                            key_column = second_table.get_column_index(right_column.value)
+                            table_with_index = second_table
+                            table_without_index = self
+                            second_table_column_id = table_without_index.get_column_index(left_column.value)
                             break
-
                 if join_index is None:
-                    return self.join_1(first_table_columns_id, left_column, left_token, new_table, operator,
-                                       right_column, right_token, second_table, second_table_columns_id)
+                    return self.join_without_index(first_table_columns_id, left_column, left_token, new_table, operator,
+                                                   right_column, right_token, second_table, second_table_columns_id)
                 else:
-                    for i in secondary_table.values.keys():
-                        lines = join_index.values.get(secondary_table.values[i][key_column])
-                        if lines is not None:
-                            for row_id in lines:
-                                value = []
-                                for first_table_id in first_table_columns_id:
-                                    value.append(self.values[row_id][first_table_id])
-                                for second_table_id in second_table_columns_id:
-                                    value.append(second_table.values[i][second_table_id])
-                                new_table.insert(value)
-                    return new_table.select(['*'], left_token=left_token, operator=operator, right_token=right_token)
+                    return self.join_with_index(first_table_columns_id, join_index, left_token, new_table, operator,
+                                                right_token, second_table_column_id, second_table_columns_id,
+                                                table_with_index, table_without_index)
 
 
             else:
@@ -147,9 +138,29 @@ class Table(object):
         else:
             self.print_table(columns, self.true(), self.values.keys())
 
-    def join_1(self, first_table_columns_id, left_column, left_token, new_table, operator, right_column, right_token,
-               second_table, second_table_columns_id):
-        join_index = SortedDict()
+    def join_with_index(self, first_table_columns_id, join_index, left_token, new_table, operator, right_token,
+                        second_table_column_id, second_table_columns_id, table_with_index, table_without_index):
+        for i in table_without_index.values.keys():
+            lines = join_index.values.get(table_without_index.values[i][second_table_column_id])
+            if lines is not None:
+                for row_id in lines:
+                    value = []
+                    if table_with_index == self:
+                        for first_table_id in first_table_columns_id:
+                            value.append(table_with_index.values[row_id][first_table_id])
+                        for second_table_id in second_table_columns_id:
+                            value.append(table_without_index.values[i][second_table_id])
+                    else:
+                        for second_table_id in second_table_columns_id:
+                            value.append(table_with_index.values[row_id][second_table_id])
+                        for first_table_id in first_table_columns_id:
+                            value.append(table_without_index.values[i][first_table_id])
+                    new_table.insert(value)
+        return new_table.select(['*'], left_token=left_token, operator=operator, right_token=right_token)
+
+    def join_without_index(self, first_table_columns_id, left_column, left_token, new_table, operator, right_column, right_token,
+                           second_table, second_table_columns_id):
+        join_index = dict()
         smaller_table = second_table
         bigger_table = self
         key_column = second_table.get_column_index(right_column.value)
@@ -159,25 +170,34 @@ class Table(object):
             bigger_table = second_table
             key_column = smaller_table.get_column_index(left_column.value)
             value_column = bigger_table.get_column_index(right_column.value)
+
         for i in smaller_table.values.keys():
             key = smaller_table.values[i][key_column]
-            join_index.update({key: []})
-        for i in bigger_table.values.keys():
-            value = bigger_table.values[i][value_column]
-            if join_index.get(value) is not None:
-                values = join_index[value]
-                values.append(i)
+            if join_index.get(key) is None:
+                join_index[key] = [i]
+            else:
+                join_index[key] += [i]
+
         row_count = 0
-        for key in join_index.keys():
+
+        for key in bigger_table.values.keys():
             value = []
-            for el in join_index[key]:
-                for id in first_table_columns_id:
-                    value.append(self.values[el][id])
-                for id in second_table_columns_id:
-                    value.append(second_table.values[row_count][id])
+            join_value = bigger_table.values[key][value_column]
+            if join_index.get(join_value) is not None:
+                if smaller_table == self:
+                    for row_id in join_index[join_value]:
+                        for id in first_table_columns_id:
+                            value.append(self.values[row_id][id])
+                        for id in second_table_columns_id:
+                            value.append(second_table.values[key][id])
+                else:
+                    for row_id in join_index[join_value]:
+                        for id in second_table_columns_id:
+                            value.append(second_table.values[row_id][id])
+                        for id in first_table_columns_id:
+                            value.append(self.values[key][id])
                 new_table.insert(value)
-                value = []
-            row_count += 1
+
         return new_table.select(['*'], left_token=left_token, operator=operator, right_token=right_token)
 
     def get_index(self, token):
@@ -247,7 +267,7 @@ class Table(object):
         for i in lines:
             if delete_condition(i):
                 for index in self.indexes:
-                    index.values.pop(self.values[i])
+                    index.values.pop(self.values[i][index.id])
                 deleted_rows += 1
                 del self.values[i]
         if deleted_rows == 1:

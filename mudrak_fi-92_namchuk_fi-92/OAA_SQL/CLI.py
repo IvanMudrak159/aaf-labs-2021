@@ -217,7 +217,9 @@ class Parser:
 
     def factor3(self):
         result = ''
-        while self.current_token.type != QUOTES and self.current_token.type != STRING:
+        while self.current_token.type != QUOTES \
+                and self.current_token.type != STRING \
+                and self.current_token.type != EOF:
             result += self.current_token.value
             self.eat(self.current_token.type)
         if result in ('=', '!=', '>', '<', '>=', '<='):
