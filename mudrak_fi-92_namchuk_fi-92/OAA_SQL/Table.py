@@ -190,13 +190,16 @@ class Table(object):
                             value.append(self.values[row_id][id])
                         for id in second_table_columns_id:
                             value.append(second_table.values[key][id])
+                        new_table.insert(value)
+                        value = []
                 else:
                     for row_id in join_index[join_value]:
                         for id in second_table_columns_id:
                             value.append(second_table.values[row_id][id])
                         for id in first_table_columns_id:
                             value.append(self.values[key][id])
-                new_table.insert(value)
+                        new_table.insert(value)
+                        value = []
 
         return new_table.select(['*'], left_token=left_token, operator=operator, right_token=right_token)
 
@@ -267,7 +270,11 @@ class Table(object):
         for i in lines:
             if delete_condition(i):
                 for index in self.indexes:
-                    index.values.pop(self.values[i][index.id])
+                    key = self.values[i][index.id]
+                    if len(index.values[key]) == 1:
+                        index.values.pop(key)
+                    else:
+                        index.values[key].remove(i)
                 deleted_rows += 1
                 del self.values[i]
         if deleted_rows == 1:
